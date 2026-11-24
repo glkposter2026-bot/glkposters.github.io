@@ -129,7 +129,7 @@ footer a { color: var(--fg); }
 var WHATSAPP_NUMBER = "916380383481";
 
 // Your email for orders and enquiries. Leave "" to hide all email buttons.
-var EMAIL = "glkposter2026@gmail.com";
+var EMAIL = "";
 
 // Sizes and prices in rupees. Sample prices, change them.
 var SIZES = { "A4": 499 };
@@ -140,10 +140,10 @@ var POSTERS = [
   { id: "GLK-MOV-001", title: "KADASIYAGA ORU AATTAM! 🔥", cat: "Movie",  image: "https://i.postimg.cc/QN4ykVFz/upscale.jpg" },
   { id: "GLK-MOV-002", title: "LET'S GET STARTED. 💀", cat: "Movie",  image: "https://i.postimg.cc/zXLH3Pm9/upscale.jpg" }, 
   { id: "GLK-MOV-003", title: "ODINFORCE", cat: "Movie",  image: "https://i.postimg.cc/Qtw9qpcD/upscale-2.jpg" },
-  { id: "GLK-SPT-001", title: "UNSTOPPABLE. UNBREAKABLE. THALAIVAN NIRANTHARAM.", cat: "Sports", image: "https://i.postimg.cc/fRBZxMhC/ipl-starts.jpg" },
-  { id: "GLK-SPT-002", title: "Sample Sports Poster 2", cat: "Sports", image: "" }
   { id: "GLK-MUS-001", title: "Sample Music Poster 1", cat: "Music",  image: "" },
   { id: "GLK-MUS-002", title: "Sample Music Poster 2", cat: "Music",  image: "" },
+  { id: "GLK-SPT-001", title: "Sample Sports Poster 1", cat: "Sports", image: "" },
+  { id: "GLK-SPT-002", title: "Sample Sports Poster 2", cat: "Sports", image: "" }
 ];
 /* ======================================================= */
 
@@ -259,15 +259,18 @@ grid.addEventListener("click", function (e) {
   a.href = a.classList.contains("mail") ? buildMailLink(p, size) : buildOrderLink(p, size);
 });
 
-document.getElementById("customLink").href = waLink("Hi GLK POSTER'S! I want a custom poster.\n\nIdea / subject:\nSize:\nDeadline:");
-
-if (EMAIL) {
-  document.getElementById("footMail").innerHTML = ' Email: <a class="contact-mail" href="mailto:' + esc(EMAIL) + '">' + esc(EMAIL) + '</a>.';
-  document.getElementById("customMail").innerHTML = 'Or email <a class="contact-mail" href="mailto:' + esc(EMAIL) + '?subject=' + encodeURIComponent("Custom poster request") + '">' + esc(EMAIL) + '</a>.';
-}
+var customLink = document.getElementById("customLink");
+if (customLink) customLink.href = waLink("Hi GLK POSTER'S! I want a custom poster.\n\nIdea / subject:\nSize:\nDeadline:");
 
 renderChips();
 render();
+
+if (EMAIL) {
+  var fm = document.getElementById("footMail");
+  var cm = document.getElementById("customMail");
+  if (fm) fm.innerHTML = ' Email: <a class="contact-mail" href="mailto:' + esc(EMAIL) + '">' + esc(EMAIL) + '</a>.';
+  if (cm) cm.innerHTML = 'Or email <a class="contact-mail" href="mailto:' + esc(EMAIL) + '?subject=' + encodeURIComponent("Custom poster request") + '">' + esc(EMAIL) + '</a>.';
+}
 </script>
 </body>
 </html>
