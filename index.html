@@ -103,7 +103,7 @@ body.pm-open { overflow: hidden; }
 .v-main .zoom { width: 100%; height: 100%; }
 .v-main .zoom img { width: 100%; height: 100%; object-fit: contain; display: block; transition: transform .15s ease; }
 .v-main .zoom .art { height: 100%; }
-@media (hover: hover) { .pm-stage .v-main .zoom { cursor: zoom-in; } .pm-stage .v-main .zoom:hover img { transform: scale(2); } }
+@media (hover: hover) { .pm-stage .v-main .zoom { cursor: zoom-in; } .pm-stage .v-main .zoom:hover img { transform: scale(var(--zm, 2)); } .pm.nozoom .pm-stage .v-main .zoom { cursor: default; } }
 .v-wall { background: linear-gradient(#e4ded5 0 76%, #b49a7c 76% 100%); }
 .v-wall .frame { position: absolute; left: 30%; top: 11%; width: 40%; aspect-ratio: 2 / 3; border: 5px solid #111; background: #fff; padding: 3px; box-shadow: 0 10px 18px rgba(0,0,0,.35); }
 .v-wall .frame img, .v-wall .frame .art { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -119,9 +119,28 @@ body.pm-open { overflow: hidden; }
 .pm-thumb .art { padding: 6px; }
 .pm-thumb .art b { font-size: .7rem; }
 .pm-thumb .art small { display: none; }
-.v-detail .dz { position: absolute; inset: 0; transform: scale(2.6); transform-origin: 50% 24%; }
+.v-detail .dz { position: absolute; inset: 0; transform: scale(var(--zd, 2)); transform-origin: 50% 24%; }
 .v-detail .dz img, .v-detail .dz .art { width: 100%; height: 100%; object-fit: cover; display: block; }
 .v-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.v-wall .room { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.v-wall .slot { position: absolute; aspect-ratio: 2 / 3; overflow: hidden; }
+.v-wall .slot img, .v-wall .slot .art { width: 100%; height: 100%; object-fit: cover; display: block; }
+.v-sizes .sz { overflow: visible; }
+.v-sizes .sz img, .v-sizes .sz .art { width: 100%; height: 100%; object-fit: cover; display: block; }
+.v-sizes .sz .art b { font-size: .6rem; }
+.v-sizes .sz .art small { display: none; }
+.v-sizes .sz.on { box-shadow: 0 0 0 2px var(--accent); }
+.v-sizes .sz.cu { border-style: dashed; }
+.v-sizes .grp { display: flex; gap: 2%; align-items: flex-end; }
+.pm-custom-box { display: grid; gap: 10px; border: 1px dashed var(--line); border-radius: 4px; padding: 12px; }
+.cs-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cs-row input[type="number"] { font: inherit; width: 84px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 8px; min-width: 0; color-scheme: dark; }
+.cs-row select { padding: 8px; }
+.cs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-chip { font: inherit; font-size: .8rem; color: var(--fg); background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.cs-chip:focus-visible, .cs-row input:focus-visible, .cs-set input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cs-set { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
+.cs-note { margin: 0; color: var(--muted); font-size: .8rem; }
 .pm-info { min-width: 0; display: flex; flex-direction: column; gap: 12px; padding-right: 30px; }
 .pm-id { align-self: flex-start; font-size: .75rem; letter-spacing: .08em; color: var(--muted); border: 1px solid var(--line); padding: 3px 8px; border-radius: 3px; font-variant-numeric: tabular-nums; }
 .pm-info h2 { font-family: var(--font-display); font-weight: 400; font-size: 2.2rem; line-height: 1; letter-spacing: .03em; margin: 0; text-wrap: balance; }
@@ -206,6 +225,7 @@ body.pm-open { overflow: hidden; }
       <div class="pm-price" id="pmPrice"></div>
       <div class="pm-label">Size</div>
       <div class="pm-sizes" id="pmSizes" role="group" aria-label="Choose size"></div>
+      <div id="pmCustom"></div>
       <div class="pm-actions" id="pmActions"></div>
       <ul class="pm-details" id="pmDetails"></ul>
     </div>
@@ -245,6 +265,19 @@ var DETAILS = [
   "Packed safely for delivery",
   "Custom size on request"
 ];
+
+// Allow customers to ask for their own size (shown as a "Custom" button in the poster window).
+var CUSTOM_ON = true;
+// Rupees per square cm for custom sizes. Leave 0 to show "Confirmed on WhatsApp" instead of a price.
+var CUSTOM_RATE = 0;
+
+// Room photo for the "On the wall" view. Put the link in src, e.g. src: "https://.../room.jpg".
+// box = [left %, top %, width %] of the empty frame area inside that photo (poster keeps 2:3 shape).
+// Leave src empty to use the simple drawn sofa scene.
+var MOCKUP = { src: "", box: [30, 11, 40] };
+
+// Quality tip: for each poster you can add  hd: "link-to-full-quality-image"
+// The big view, wall view and zoom use hd. Cards use image. If hd is missing, image is used.
 /* ======================================================= */
 
 var CLASS_BY_CAT = { Movie: "mov", Music: "mus", Sports: "spt" };
@@ -279,8 +312,8 @@ function orderText(p, size, oid) {
     "Order ID: " + oid + "\n" +
     "Poster ID: " + p.id + "\n" +
     "Poster: " + p.title + "\n" +
-    "Size: " + size + "\n" +
-    "Price: Rs." + SIZES[size] + "\n\n" +
+    "Size: " + sizeLabel(size) + "\n" +
+    "Price: " + priceText(size) + "\n\n" +
     "My name:\n" +
     "Delivery address:\n" +
     "Pincode:"
@@ -372,8 +405,9 @@ var cur = null;
 var lastFocus = null;
 
 function coverInner(p) {
-  return p.image
-    ? '<img src="' + esc(p.image) + '" alt="' + esc(p.title) + '">'
+  var src = p.hd || p.image;
+  return src
+    ? '<img src="' + esc(src) + '" alt="' + esc(p.title) + '" decoding="async">'
     : '<div class="art ' + (CLASS_BY_CAT[p.cat] || "mov") + '"><b>' + esc(p.title) + '</b><small>' + esc(p.cat) + ' poster</small></div>';
 }
 
@@ -383,22 +417,68 @@ function viewsFor(p) {
   return v;
 }
 
-function sizesView(size) {
-  var keys = Object.keys(SIZES).filter(function (k) { return DIMS[k]; });
-  var total = keys.reduce(function (a, k) { return a + DIMS[k][0]; }, 0);
-  var boxes = keys.map(function (k) {
-    var w = DIMS[k][0], h = DIMS[k][1];
-    var wp = (w / total) * 78;
-    return '<div class="sz' + (k === size ? " on" : "") + '" style="width:' + wp.toFixed(1) + '%;aspect-ratio:' + w + ' / ' + h + '">' +
-      '<span class="lbl">' + esc(k) + '<br>' + w + ' x ' + h + ' cm</span></div>';
+var custom = { w: 30, h: 45, unit: "cm", set: false };
+
+function fmt(n) { return String(Math.round(n * 100) / 100); }
+
+function customCm() {
+  var f = custom.unit === "in" ? 2.54 : 1;
+  return { w: custom.w * f, h: custom.h * f };
+}
+
+function customValid() {
+  var c = customCm();
+  return isFinite(c.w) && isFinite(c.h) && c.w > 0 && c.h > 0 && c.w <= 400 && c.h <= 400;
+}
+
+function sizeLabel(size) {
+  if (size !== "Custom") return size;
+  return "Custom " + fmt(custom.w) + " x " + fmt(custom.h) + " " + custom.unit + (custom.set ? " (set of 3 posters)" : "");
+}
+
+function priceText(size) {
+  if (size !== "Custom") return "Rs." + SIZES[size];
+  if (CUSTOM_RATE > 0 && customValid()) {
+    var c = customCm();
+    return "Rs." + Math.round(c.w * c.h * CUSTOM_RATE * (custom.set ? 3 : 1));
+  }
+  return "Confirmed on WhatsApp";
+}
+
+function sizesView(size, p) {
+  var items = Object.keys(SIZES).filter(function (k) { return DIMS[k]; }).map(function (k) {
+    return { k: k, w: DIMS[k][0], h: DIMS[k][1], n: 1, on: k === size, cu: false, lbl: esc(k) + '<br>' + DIMS[k][0] + ' x ' + DIMS[k][1] + ' cm' };
+  });
+  if (CUSTOM_ON && customValid()) {
+    var c = customCm();
+    items.push({ k: "Custom", w: c.w, h: c.h, n: custom.set ? 3 : 1, on: size === "Custom", cu: true,
+      lbl: 'Custom<br>' + fmt(custom.w) + ' x ' + fmt(custom.h) + ' ' + custom.unit + (custom.set ? '<br>x 3 posters' : '') });
+  }
+  var total = items.reduce(function (a, it) { return a + it.w * it.n; }, 0);
+  var boxes = items.map(function (it) {
+    var wp = (it.w / total) * 76;
+    var one = function (label) {
+      return '<div class="sz' + (it.on ? " on" : "") + (it.cu ? " cu" : "") + '" style="width:' + (it.n > 1 ? "100%" : wp.toFixed(1) + "%") + ';aspect-ratio:' + it.w.toFixed(2) + ' / ' + it.h.toFixed(2) + '">' +
+        coverInner(p) + (label ? '<span class="lbl">' + it.lbl + '</span>' : '') + '</div>';
+    };
+    if (it.n > 1) {
+      return '<div class="grp" style="width:' + (wp * it.n).toFixed(1) + '%">' + one(false) + one(true) + one(false) + '</div>';
+    }
+    return one(true);
   }).join("");
   return '<div class="v v-sizes">' + boxes + '</div>';
 }
 
 function viewHtml(view, p, size) {
   if (view === "main") return '<div class="v v-main"><div class="zoom">' + coverInner(p) + '</div></div>';
-  if (view === "wall") return '<div class="v v-wall"><div class="sofa"></div><div class="frame">' + coverInner(p) + '</div></div>';
-  if (view === "sizes") return sizesView(size);
+  if (view === "wall") {
+    if (MOCKUP.src) {
+      return '<div class="v v-wall"><img class="room" src="' + esc(MOCKUP.src) + '" alt="Poster on a wall" decoding="async">' +
+        '<div class="slot" style="left:' + MOCKUP.box[0] + '%;top:' + MOCKUP.box[1] + '%;width:' + MOCKUP.box[2] + '%">' + coverInner(p) + '</div></div>';
+    }
+    return '<div class="v v-wall"><div class="sofa"></div><div class="frame">' + coverInner(p) + '</div></div>';
+  }
+  if (view === "sizes") return sizesView(size, p);
   if (view === "detail") return '<div class="v v-detail"><div class="dz">' + coverInner(p) + '</div></div>';
   if (view.indexOf("img:") === 0) return '<div class="v v-img"><img src="' + esc(view.slice(4)) + '" alt="' + esc(p.title) + '"></div>';
   return "";
@@ -412,7 +492,7 @@ function renderModal() {
   document.getElementById("pmId").textContent = p.id;
   document.getElementById("pmTitle").textContent = p.title;
   document.getElementById("pmCat").textContent = p.cat + " poster";
-  document.getElementById("pmPrice").textContent = "Rs." + SIZES[size];
+  document.getElementById("pmPrice").textContent = priceText(size);
   pmStage.innerHTML = viewHtml(cur.view, p, size);
   pmThumbs.innerHTML = views.map(function (v, i) {
     var name = VIEW_NAMES[v] || ("Photo " + (i + 1));
@@ -421,11 +501,62 @@ function renderModal() {
   pmSizes.innerHTML = Object.keys(SIZES).map(function (k) {
     var d = DIMS[k] ? '<small>' + DIMS[k][0] + ' x ' + DIMS[k][1] + ' cm</small>' : "";
     return '<button type="button" class="pm-size" data-size="' + esc(k) + '" aria-pressed="' + (k === size) + '">' + esc(k) + ' &middot; Rs.' + SIZES[k] + d + '</button>';
-  }).join("");
+  }).join("") + (CUSTOM_ON ? '<button type="button" class="pm-size" data-size="Custom" aria-pressed="' + (size === "Custom") + '">Custom<small>Your own size</small></button>' : "");
+  renderCustomForm();
   pmActions.innerHTML =
     '<a class="order" href="#" target="_blank" rel="noopener">Order on WhatsApp</a>' +
     (EMAIL ? '<a class="mail" href="#">Email</a>' : "");
   document.getElementById("pmDetails").innerHTML = DETAILS.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("");
+}
+
+var RATIOS = [["2:3", 2, 3], ["3:4", 3, 4], ["4:5", 4, 5], ["9:16", 9, 16]];
+
+function renderCustomForm() {
+  var box = document.getElementById("pmCustom");
+  if (!CUSTOM_ON || cur.size !== "Custom") { box.innerHTML = ""; return; }
+  box.innerHTML =
+    '<div class="pm-custom-box">' +
+      '<div class="cs-row">' +
+        '<input id="cw" type="number" min="1" step="any" inputmode="decimal" value="' + fmt(custom.w) + '" aria-label="Width">' +
+        '<span aria-hidden="true">x</span>' +
+        '<input id="ch" type="number" min="1" step="any" inputmode="decimal" value="' + fmt(custom.h) + '" aria-label="Height">' +
+        '<select id="cu" aria-label="Unit"><option value="cm"' + (custom.unit === "cm" ? " selected" : "") + '>cm</option><option value="in"' + (custom.unit === "in" ? " selected" : "") + '>inch</option></select>' +
+      '</div>' +
+      '<div class="cs-chips" role="group" aria-label="Pick a ratio">' +
+        RATIOS.map(function (r) { return '<button type="button" class="cs-chip" data-a="' + r[1] + '" data-b="' + r[2] + '">' + r[0] + '</button>'; }).join("") +
+      '</div>' +
+      '<label class="cs-set" for="cset"><input id="cset" type="checkbox"' + (custom.set ? " checked" : "") + '> Set of 3 posters side by side</label>' +
+      '<p class="cs-note">Ratio 3:4 matches 2160 x 2880 px designs and 9:16 matches 2160 x 3840. Price is confirmed on WhatsApp.</p>' +
+    '</div>';
+}
+
+function refreshCustom() {
+  document.getElementById("pmPrice").textContent = priceText(cur.size);
+  var th = pmThumbs.querySelector('[data-view="sizes"]');
+  if (th) th.innerHTML = viewHtml("sizes", cur.p, cur.size);
+  if (cur.view === "sizes") pmStage.innerHTML = viewHtml("sizes", cur.p, cur.size);
+}
+
+// Zoom never goes past the real pixels of the image, so zoomed views stay sharp.
+// A low quality image zooms less. Add hd: "link" on a poster for more zoom.
+function setZoom(p) {
+  pm.style.removeProperty("--zm");
+  pm.style.removeProperty("--zd");
+  pm.classList.remove("nozoom");
+  var src = p.hd || p.image;
+  if (!src) return;
+  var im = new Image();
+  im.onload = function () {
+    if (!cur || cur.p !== p || !pmStage.clientWidth || !im.naturalWidth) return;
+    var sw = pmStage.clientWidth, sh = pmStage.clientHeight, dpr = window.devicePixelRatio || 1;
+    var nw = im.naturalWidth, nh = im.naturalHeight;
+    var zm = 1 / (Math.min(sw / nw, sh / nh) * dpr);
+    var zd = 1 / (Math.max(sw / nw, sh / nh) * dpr);
+    pm.style.setProperty("--zm", Math.max(1, Math.min(3, zm)).toFixed(2));
+    pm.style.setProperty("--zd", Math.max(1.2, Math.min(2.6, zd)).toFixed(2));
+    pm.classList.toggle("nozoom", zm < 1.1);
+  };
+  im.src = src;
 }
 
 function openModal(p, size) {
@@ -435,6 +566,7 @@ function openModal(p, size) {
   pm.hidden = false;
   document.body.classList.add("pm-open");
   pm.querySelector(".pm-x").focus();
+  setZoom(p);
 }
 
 function closeModal() {
@@ -467,9 +599,35 @@ pm.addEventListener("click", function (e) {
   var th = e.target.closest(".pm-thumb");
   if (th) { cur.view = th.getAttribute("data-view"); renderModal(); return; }
   var sz = e.target.closest(".pm-size");
-  if (sz) { cur.size = sz.getAttribute("data-size"); renderModal(); return; }
+  if (sz) {
+    cur.size = sz.getAttribute("data-size");
+    if (cur.size === "Custom") cur.view = "sizes";
+    renderModal();
+    return;
+  }
+  var chip = e.target.closest(".cs-chip");
+  if (chip) {
+    custom.h = Math.round(custom.w * (+chip.getAttribute("data-b")) / (+chip.getAttribute("data-a")) * 100) / 100;
+    document.getElementById("ch").value = fmt(custom.h);
+    refreshCustom();
+    return;
+  }
   var a = e.target.closest(".order, .mail");
   if (a) a.href = a.classList.contains("mail") ? buildMailLink(cur.p, cur.size) : buildOrderLink(cur.p, cur.size);
+});
+
+pm.addEventListener("input", function (e) {
+  if (e.target.id === "cw") custom.w = parseFloat(e.target.value);
+  else if (e.target.id === "ch") custom.h = parseFloat(e.target.value);
+  else return;
+  refreshCustom();
+});
+
+pm.addEventListener("change", function (e) {
+  if (e.target.id === "cu") custom.unit = e.target.value;
+  else if (e.target.id === "cset") custom.set = e.target.checked;
+  else return;
+  refreshCustom();
 });
 
 pm.addEventListener("mousemove", function (e) {
